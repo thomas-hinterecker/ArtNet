@@ -14,9 +14,8 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', length = 100, 
         fill        - Optional  : bar fill character (Str)
     """
     filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '>' * int((length - filledLength) > 0)  + '.' * (length - filledLength)
-    print('\r%s [%s] %ss %s' % (prefix, bar, timer, suffix), end = '\r')
-    # Print New Line on Complete
+    bar = fill * (filledLength) + '>' * int((length - filledLength) > 0) + '.' * (length - filledLength -1)
+    print('\r%s [%s] %1.1fs %s' % (prefix, bar, timer, suffix), end = '\r')
     #if iteration == total: 
     #    print()
 

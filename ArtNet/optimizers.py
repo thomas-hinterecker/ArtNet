@@ -21,8 +21,8 @@ class GradientDescent(Optimizer):
 
     beta = 0.0
 
-    _vdW = [0]
-    _vdb = [0]
+    _vdweights = [0]
+    _vdbias = [0]
 
     def __init__(self, lr=0.01, beta=0.0, decay=0.0):
         self.lr = lr
@@ -31,24 +31,24 @@ class GradientDescent(Optimizer):
 
     def init(self, model):
         for layer in range(1, model.n_layers + 1):
-            self._vdW.append(np.zeros(model.W[layer].shape))
-            self._vdb.append(np.zeros(model.b[layer].shape))
+            self._vdweights.append(np.zeros_like(model.layers[layer].weights))
+            self._vdbias.append(np.zeros_like(model.layers[layer].bias))
 
     def optimize(self, model):
         for layer in range(1, model.n_layers + 1):
-            if model.dW[layer] is not None:
-                self._vdW[layer] = self.beta * self._vdW[layer] + (1 - self.beta) * model.dW[layer]
-                self._vdb[layer] = self.beta * self._vdb[layer] + (1 - self.beta) * model.db[layer]
-                model.W[layer] = model.W[layer] - self.lr * self._vdW[layer]
-                model.b[layer] = model.b[layer] - self.lr * self._vdb[layer]
+            if model.layers[layer].dweights is not None:
+                self._vdweights[layer] = self.beta * self._vdweights[layer] + (1 - self.beta) * model.layers[layer].dweights
+                self._vdbias[layer] = self.beta * self._vdbias[layer] + (1 - self.beta) * model.layers[layer].dbias
+                model.layers[layer].weights = model.layers[layer].weights - self.lr * self._vdweights[layer]
+                model.layers[layer].bias = model.layers[layer].bias - self.lr * self._vdbias[layer]
 
 class RMSprop(Optimizer):
 
     beta1 = 0.9
     epsilon = 1e-08
 
-    _sdW = [0]
-    _sdb = [0]
+    _sdweights = [0]
+    _sdbias = [0]
 
     def __init__(self, lr=0.001, beta1=0.9, epsilon=1e-08, decay=0.0):
         self.lr = lr
@@ -58,16 +58,16 @@ class RMSprop(Optimizer):
 
     def init(self, model):
         for layer in range(1, model.n_layers + 1):
-            self._sdW.append(np.zeros(model.W[layer].shape))
-            self._sdb.append(np.zeros(model.b[layer].shape))
+            self._sdweights.append(np.zeros_like(model.layers[layer].weights))
+            self._sdbias.append(np.zeros_like(model.layers[layer].bias))
 
     def optimize(self, model):
         for layer in range(1, model.n_layers + 1):
-            if model.dW[layer] is not None:
-                self._sdW[layer] =  self.beta1 * self._sdW[layer] + (1 - self.beta1) * np.square(model.dW[layer])
-                self._sdb[layer] =  self.beta1 * self._sdb[layer] + (1 - self.beta1) * np.square(model.db[layer])
-                model.W[layer] = model.W[layer] - self.lr * model.dW[layer] / (np.sqrt(self._sdW[layer]) + self.epsilon)
-                model.b[layer] = model.b[layer] - self.lr * model.db[layer] / (np.sqrt(self._sdb[layer]) + self.epsilon)
+            if model.layers[layer].dweights is not None:
+                self._sdweights[layer] =  self.beta1 * self._sdweights[layer] + (1 - self.beta1) * np.square(model.layers[layer].dweights)
+                self._sdbias[layer] =  self.beta1 * self._sdbias[layer] + (1 - self.beta1) * np.square(model.layers[layer].dbias)
+                model.layers[layer].weights = model.layers[layer].weights - self.lr * model.layers[layer].dweights / (np.sqrt(self._sdweights[layer]) + self.epsilon)
+                model.layers[layer].bias = model.layers[layer].bias - self.lr * model.layers[layer].dbias / (np.sqrt(self._sdbias[layer]) + self.epsilon)
 
 class Adam(Optimizer):
 
@@ -77,10 +77,10 @@ class Adam(Optimizer):
 
     _t = 0
 
-    _vdW = [0]
-    _vdb = [0]
-    _sdW = [0]
-    _sdb = [0] 
+    _vdweights = [0]
+    _vdbias = [0]
+    _sdweights = [0]
+    _sdbias = [0] 
 
     def __init__(self, lr=0.002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0):
         self.lr = lr
@@ -92,24 +92,24 @@ class Adam(Optimizer):
 
     def init(self, model):
         for layer in range(1, model.n_layers + 1):
-            self._vdW.append(np.zeros_like(model.W[layer]))
-            self._vdb.append(np.zeros_like(model.b[layer]))
-            self._sdW.append(np.zeros_like(model.W[layer]))
-            self._sdb.append(np.zeros_like(model.b[layer]))            
+            self._vdweights.append(np.zeros_like(model.layers[layer].weights))
+            self._vdbias.append(np.zeros_like(model.layers[layer].bias))
+            self._sdweights.append(np.zeros_like(model.layers[layer].weights))
+            self._sdbias.append(np.zeros_like(model.layers[layer].bias))            
  
     def optimize(self, model):
         self._t += 1 # Adam counter
         for layer in range(1, model.n_layers + 1):
-            if model.dW[layer] is not None:
-                self._vdW[layer] = self.beta_1 * self._vdW[layer] + (1 - self.beta_1) * model.dW[layer]
-                self._vdb[layer] = self.beta_1 * self._vdb[layer] + (1 - self.beta_1) * model.db[layer]
-                self._sdW[layer] = self.beta_2 * self._sdW[layer] + (1 - self.beta_2) * np.square(model.dW[layer])
-                self._sdb[layer] = self.beta_2 * self._sdb[layer] + (1 - self.beta_2) * np.square(model.db[layer])
+            if model.layers[layer].dweights is not None:
+                self._vdweights[layer] = self.beta_1 * self._vdweights[layer] + (1 - self.beta_1) * model.layers[layer].dweights
+                self._vdbias[layer] = self.beta_1 * self._vdbias[layer] + (1 - self.beta_1) * model.layers[layer].dbias
+                self._sdweights[layer] = self.beta_2 * self._sdweights[layer] + (1 - self.beta_2) * np.square(model.layers[layer].dweights)
+                self._sdbias[layer] = self.beta_2 * self._sdbias[layer] + (1 - self.beta_2) * np.square(model.layers[layer].dbias)
 
-                _vdW_corr = self._vdW[layer] / (1.0 - np.power(self.beta_1, self._t))
-                _vdb_corr = self._vdb[layer] / (1.0 - np.power(self.beta_1, self._t))
-                _sdW_corr = self._sdW[layer] / (1.0 - np.power(self.beta_2, self._t))
-                _sdb_corr = self._sdb[layer] / (1.0 - np.power(self.beta_2, self._t))
+                _vdweights_corr = self._vdweights[layer] / (1.0 - np.power(self.beta_1, self._t))
+                _vdbias_corr = self._vdbias[layer] / (1.0 - np.power(self.beta_1, self._t))
+                _sdweights_corr = self._sdweights[layer] / (1.0 - np.power(self.beta_2, self._t))
+                _sdbias_corr = self._sdbias[layer] / (1.0 - np.power(self.beta_2, self._t))
 
-                model.W[layer] = model.W[layer] - self.lr * _vdW_corr / np.sqrt(_sdW_corr + self.epsilon)
-                model.b[layer] = model.b[layer] - self.lr * _vdb_corr / np.sqrt(_sdb_corr + self.epsilon)
+                model.layers[layer].weights = model.layers[layer].weights - self.lr * _vdweights_corr / np.sqrt(_sdweights_corr + self.epsilon)
+                model.layers[layer].bias = model.layers[layer].bias - self.lr * _vdbias_corr / np.sqrt(_sdbias_corr + self.epsilon)
