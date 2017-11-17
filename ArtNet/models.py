@@ -4,8 +4,6 @@ import importlib
 from timeit import default_timer as timer
 from ArtNet.lib import printProgressBar
 from ArtNet.layers import Layer, Input
-from ArtNet.regularizers import Regularizer
-from ArtNet.optimizers import Optimizer
 
 class Sequential:
     """ Neural Network Model """

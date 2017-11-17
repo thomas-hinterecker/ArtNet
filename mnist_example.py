@@ -17,7 +17,6 @@ X_train, X_test, y_train, y_test = train_test_split(mnist.data/255, mnist.target
 #print(X_train.shape)
 #print(y_train.shape)
 
-
 ## Neural Network
 from ArtNet.models import Sequential
 from ArtNet.layers import Input, Dense, Conv2D, Activation, Dropout, BatchNormalization
@@ -40,17 +39,17 @@ model.fit(X_train, y_train, epochs=5, batch_size=500, validation_data=(X_test, y
 #print("Accuracy:", (1 - np.sum(np.abs(y_test - np.round(np.squeeze(y_pred)))) / y_test.shape[0]) * 100, '%')
 #print("Accuracy:", np.round((1 - np.sum(np.argmax(y_test, axis=1) != np.argmax(y_pred, axis=1)) / X_test.shape[0]) * 100, 2), "%")
 
-# ## Keras
+## Keras
 # from keras.models import Sequential
 # from keras.layers import Dense, Activation, BatchNormalization
 # from keras.optimizers import SGD, Adam, RMSprop
 
 # model = Sequential()
 # model.add(Dense(128, input_dim=784, activation='relu')) 
-# model.add(BatchNormalization())
+# #model.add(BatchNormalization())
 # model.add(Dense(10, activation='softmax'))
 # model.compile(loss='categorical_crossentropy', optimizer="Adam", metrics=["accuracy"])
-# model.fit(X_train, y_train, epochs=2, batch_size=500, validation_data=(X_test, y_test))
+# model.fit(X_train, y_train, epochs=5, batch_size=500, validation_data=(X_test, y_test))
 
 #y_pred = model.predict(X_test, batch_size=500, verbose=0)
 #print("Accuracy:", np.round((1 - np.sum(np.argmax(y_test, axis=1) != np.argmax(y_pred, axis=1)) / X_test.shape[0]) * 100, 2), "%")
