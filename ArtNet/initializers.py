@@ -13,13 +13,13 @@ class Initializer:
 
 class Zeros(Initializer):
 
-    def initialize(self, n_inputs, n_nodes):
-        return np.zeros((n_nodes, n_inputs))
+    def initialize(self, shape):
+        return np.zeros(shape)
 
 class Ones(Initializer):
 
-    def initialize(self, n_inputs, n_nodes):
-        return np.ones((n_nodes, n_inputs))    
+    def initialize(self,  shape):
+        return np.ones(shape)    
 
 class RandomUniform(Initializer):
 
@@ -28,9 +28,9 @@ class RandomUniform(Initializer):
     def __init__(self, seed=None):
         self.seed = seed
 
-    def initialize(self, n_inputs, n_nodes):
-        np.random.seed(seed) if self.seed is not None else None
-        return np.random.randn(n_nodes, n_inputs)
+    def initialize(self, shape):
+        np.random.seed(self.seed) if self.seed is not None else None
+        return np.random.standard_normal(shape)
 
 class GlorotNormal(Initializer):
 
@@ -39,9 +39,9 @@ class GlorotNormal(Initializer):
     def __init__(self, seed=None):
         self.seed = seed
 
-    def initialize(self, n_inputs, n_nodes):
-        np.random.seed(seed) if self.seed is not None else None
-        return np.random.randn(n_nodes, n_inputs) * np.square(2.0 / (n_inputs + n_nodes))
+    def initialize(self, shape):
+        np.random.seed(self.seed) if self.seed is not None else None
+        return np.random.standard_normal(shape) * np.square(2.0 / (shape[1] + shape[0]))
 
 class GlorotUniform(Initializer):
 
@@ -50,6 +50,6 @@ class GlorotUniform(Initializer):
     def __init__(self, seed=None):
         self.seed = seed
 
-    def initialize(self, n_inputs, n_nodes):
-        np.random.seed(seed) if self.seed is not None else None
-        return np.random.randn(n_nodes, n_inputs) * np.square(6.0 / (n_inputs + n_nodes))
+    def initialize(self, shape):
+        np.random.seed(self.seed) if self.seed is not None else None
+        return np.random.standard_normal(shape) * np.square(6.0 / (shape[1] + shape[0]))
