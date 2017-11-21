@@ -9,7 +9,7 @@ class Sequential:
     """ Neural Network Model """
 
     ##
-    samples_axis = 1
+    samples_axis = -1
     nodes_axis = 0
 
     ##
@@ -95,7 +95,7 @@ class Sequential:
                     self.batch_size = batch_size
                     suffix += ' - val_loss: {:.4f}'.format(np.round(val_loss, 4))
                     if 'accuracy' in self.metrics:   
-                        suffix += ' - val_acc: {:1.4f}'.format(np.round(self.lossf.accuracy(self.layers[self.n_layers].output, validation_data[1]), 4))
+                        suffix += ' - val_acc: {:1.4f}'.format(np.round(self.lossf.accuracy(self.layers[self.n_layers].output, validation_data[1].T), 4))
                     printProgressBar(i + 1, num_batches, prefix = prefix, suffix = suffix, length = np.min((30, num_batches)), timer = difftime) if verbose == 1 else None
             print() if verbose == 1 else None
 
@@ -103,7 +103,6 @@ class Sequential:
         self.is_train = False
         self.batch_size = batch_size
         x, y = self._prepData(x, y)
-        #self.layers[0].n_nodes = x.shape[self.nodes_axis]
         # batches
         num_batches = int(x.shape[self.samples_axis] / self.batch_size)
         val_x_batches = self._prepBatches(x, num_batches, axis=self.samples_axis)
@@ -118,7 +117,6 @@ class Sequential:
         self.batch_size = batch_size
         x, y = self._prepData(x)
         n_samples = x.shape[self.samples_axis]
-        self.layers[0].n_nodes = X.shape[0]
         # batches
         num_batches = int(n_samples / self.batch_size)
         x_batches = self._prepBatches(X, num_batches, axis=self.samples_axis)

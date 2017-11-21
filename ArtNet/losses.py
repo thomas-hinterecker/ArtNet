@@ -4,13 +4,13 @@ import math
 class Loss:
     
     def L(self, y_pred, y_true):
-        return y_pred - y_true
-
-    def L_prime(self, y_pred, y_true):
         return 0
 
+    def L_prime(self, y_pred, y_true):
+        return y_pred
+
     def accuracy(self, y_pred, y_true):
-        pass
+        return 0
 
 class MeanSquaredError(Loss):
 
@@ -30,14 +30,14 @@ class BinaryCrossEntropy(Loss):
 
     def L_prime(self, y_pred, y_true):
         return - (np.divide(y_true, y_pred) - np.divide(1 - y_true, 1 - y_pred))
-  
+
 class CategoricalCrossEntropy(Loss):
 
     #epsilon = 1e-15
 
     def L(self, y_pred, y_true):
         #y_pred = np.clip(y_pred, self.epsilon, 1 - self.epsilon)
-        loss = - np.sum(y_true * np.log(y_pred), axis=1)
+        loss = - np.sum(y_true * np.log(y_pred), axis=1)   
         cost = np.mean(loss, axis=-1)
         return cost
 
@@ -47,5 +47,5 @@ class CategoricalCrossEntropy(Loss):
     def accuracy(self, y_pred, y_true):
         preds_correct_boolean =  np.argmax(y_pred.T, axis=1) == np.argmax(y_true.T, axis=1)
         correct_predictions = np.sum(preds_correct_boolean)
-        accuracy = correct_predictions / y_pred.shape[0]
+        accuracy = correct_predictions / y_pred.T.shape[0]
         return accuracy

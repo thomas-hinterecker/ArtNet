@@ -18,9 +18,9 @@ mnist.target = lb.transform(mnist.target)
 x_train, x_test, y_train, y_test = train_test_split(mnist.data/255, mnist.target, test_size=0.2)
 input_shape = img_rows * img_cols
 
-#x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
-#x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
-#input_shape = (img_rows, img_cols, 1)
+x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+input_shape = (img_rows, img_cols, 1)
 #print(x_train.shape)
 #print(y_train.shape)
 
@@ -29,21 +29,19 @@ from ArtNet.models import Sequential
 from ArtNet.layers import Input, Dense, Conv2D, MaxPooling2D, Flatten, Activation, Dropout, BatchNormalization
 from ArtNet.activations import ReLU, Sigmoid, Softmax, Tanh, Leaky_ReLU, Linear
 from ArtNet.regularizers import L2
-from ArtNet.losses import MeanSquaredError, BinaryCrossEntropy, CategoricalCrossEntropy
+from ArtNet.losses import Loss, MeanSquaredError, BinaryCrossEntropy, CategoricalCrossEntropy
 from ArtNet.optimizers import GradientDescent, RMSprop, Adam
 from ArtNet.lib import r_squared
 
 model = Sequential()
 model.add(Input(input_shape=input_shape))
-model.add(Dense(nodes=128, activation=ReLU()))
-#model.add(Conv2D(filters=1, kernel_size=(3, 3), padding="same", activation="ReLU", weight_initializer='GlorotUniform')) #, weight_regularizer=L2()
-#model.add(Activation(ReLU()))
+model.add(Conv2D(32, kernel_size=(3, 3), padding="same", activation="ReLU", weight_regularizer=L2()))
 #model.add(MaxPooling2D(strides=(2, 2)))
-#model.add(Flatten())
-#model.add(BatchNormalization())
+model.add(Flatten())
+model.add(Dense(nodes=128, activation=ReLU()))
 model.add(Dense(nodes=10, activation=Softmax()))
 model.compile(loss=CategoricalCrossEntropy(), optimizer=Adam(), metrics=["accuracy"])
-model.fit(x_train, y_train, epochs=2, batch_size=500, validation_data=(x_test, y_test))
+model.fit(x_train, y_train, epochs=2, batch_size=200, validation_data=(x_test, y_test))
 
 #y_pred = model.predict(x_test, batch_size=500, verbose=0)
 #print("Accuracy:", (1 - np.sum(np.abs(y_test - np.round(np.squeeze(y_pred)))) / y_test.shape[0]) * 100, '%')
@@ -51,15 +49,18 @@ model.fit(x_train, y_train, epochs=2, batch_size=500, validation_data=(x_test, y
 
 ## Keras
 # from keras.models import Sequential
-# from keras.layers import Dense, Activation, BatchNormalization
-# from keras.optimizers import SGD, Adam, RMSprop
+# from keras.layers import Dense, Conv2D, MaxPooling2D, Flatten, Activation, Dropout
+# from keras.optimizers import Adam
 
 # model = Sequential()
-# model.add(Dense(128, input_dim=784, activation='tanh')) 
-# #model.add(BatchNormalization())
+# model.add(Conv2D(3, kernel_size=(3, 3), activation='relu', input_shape=input_shape)) 
+# model.add(Dropout(0.8))
+# #model.add(MaxPooling2D(strides=(2, 2)))
+# model.add(Flatten())
+# model.add(Dense(128, activation='relu'))
 # model.add(Dense(10, activation='softmax'))
-# model.compile(loss='categorical_crossentropy', optimizer="sgd", metrics=["accuracy"])
-# model.fit(x_train, y_train, epochs=2, batch_size=500, validation_data=(x_test, y_test))
+# model.compile(loss='categorical_crossentropy', optimizer="Adam", metrics=["accuracy"])
+# model.fit(x_train, y_train, epochs=2, batch_size=200, validation_data=(x_test, y_test))
 
 #y_pred = model.predict(x_test, batch_size=500, verbose=0)
 #print("Accuracy:", np.round((1 - np.sum(np.argmax(y_test, axis=1) != np.argmax(y_pred, axis=1)) / X_test.shape[0]) * 100, 2), "%")
