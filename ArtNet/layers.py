@@ -7,6 +7,7 @@ class Layer:
 
     shape = None
     n_layer = 0
+    #n_nodes = -1
     # Output variable
     output = None
     # Defines if Layer is trainable meaning that whether the weights and biases can be optimized
@@ -26,15 +27,31 @@ class Layer:
         model.layers.append(self)
 
     def onStart(self, model):
-        if self.shape is None:
-            self.shape = model.layers[self.n_layer - 1].shape
-        #
-        if self.is_trainable:
-            n_nodes0 = model.layers[self.n_layer - 1].shape[model.nodes_axis]
-            self.weights = self.weight_initializer.initialize((self.shape[model.nodes_axis], n_nodes0))
-            self.bias = self.bias_initializer.initialize((self.shape[model.nodes_axis], 1))
-            assert(self.weights.shape == (self.shape[model.nodes_axis], n_nodes0))
-            assert(self.bias.shape == (self.shape[model.nodes_axis], 1))
+        if model.is_train:
+            if self.shape is None:
+                self.shape = model.layers[self.n_layer - 1].shape
+            #
+            if self.is_trainable:
+                n_nodes0 = model.layers[self.n_layer - 1].shape[model.nodes_axis]
+                self.weights = self.weight_initializer.initialize((self.shape[model.nodes_axis], n_nodes0))
+                self.bias = self.bias_initializer.initialize((self.shape[model.nodes_axis], 1))
+                assert(self.weights.shape == (self.shape[model.nodes_axis], n_nodes0))
+                assert(self.bias.shape == (self.shape[model.nodes_axis], 1))   
+
+    # def onAdd(self, model):
+    #     model.n_layers += 1
+    #     self.n_layer = model.n_layers
+
+    #     if self.n_layer > 0 and self.n_nodes == -1:
+    #         self.n_nodes = model.layers[self.n_layer - 1].n_nodes
+
+    #     model.layers.append(self)
+
+    # def onStart(self, model):
+    #     if self.is_trainable:
+    #         n_nodes0 = model.layers[self.n_layer - 1].n_nodes
+    #         self.weights = self.weight_initializer.initialize((self.n_nodes, n_nodes0))
+    #         self.bias = self.bias_initializer.initialize((self.n_nodes, 1))
 
     def onEpochStart(self, model):
         pass
@@ -53,6 +70,7 @@ class Input(Layer):
         if not isinstance(input_shape, (list, tuple)):
             input_shape = (input_shape,)
         self.shape = input_shape
+        #self.n_nodes = input_shape
 
     def onStart(self, model):
         if model.samples_axis == 0:
@@ -78,12 +96,14 @@ class Trainable(Layer):
 
 class Dense(Trainable):
     """Dense neural network layer"""
+
     activation = None
     weight_initializer = None
     bias_initializer = None
     weight_regularizer = None
 
     def __init__(self, nodes, activation="Linear", weight_initializer='GlorotUniform', bias_initializer='Zeros', weight_regularizer=None):
+        #self.n_nodes = nodes
         self.shape = (nodes, )
         self._InitLayer(activation, weight_initializer, bias_initializer, weight_regularizer)
 
@@ -104,14 +124,13 @@ class Dense(Trainable):
         super(Dense, self).onStart(model)
 
     def Forward(self, model, layer):
-        self.output = (np.matmul(self.weights, model.layers[layer - 1].output) + self.bias)
+        self.output = np.matmul(self.weights, model.layers[layer - 1].output) + self.bias
         if model.is_train:
             assert(self.output.shape ==  self.shape)
-        return self.output
 
     def Backward(self, model, layer, dOut0):
         self.dweights = 1 / model.batch_size * np.matmul(dOut0, model.layers[layer - 1].output.T)
-        self.dbias = np.squeeze(1 / model.batch_size * np.sum(dOut0, keepdims=True))
+        self.dbias = 1 / model.batch_size * np.sum(dOut0, keepdims=True)
         dOut = np.matmul(self.weights.T, dOut0)
         assert (dOut.shape == model.layers[self.n_layer - 1].shape)
         assert (self.dweights.shape == self.weights.shape)
@@ -298,24 +317,6 @@ class MaxPooling2D(Layer):
         mask = x == np.max(x)
         return mask
 
-    # def _DistributeValue(dz, shape):
-    #     """
-    #     Distributes the input value in the matrix of dimension shape
-        
-    #     Arguments:
-    #     dz -- input scalar
-    #     shape -- the shape (n_H, n_W) of the output matrix for which we want to distribute the value of dz
-        
-    #     Returns:
-    #     a -- Array of size (n_H, n_W) for which we distributed the value of dz
-    #     """
-    #     # Retrieve dimensions from shape
-    #     (n_H, n_W) = shape
-    #     # Compute the value to distribute on the matrix (≈1 line)
-    #     average = dz / (n_H * n_W)
-    #     # Create a matrix where every entry is the "average" value (≈1 line)
-    #     return np.ones(shape) * average
-
 class Flatten(Layer):
 
     def onStart(self, model):
@@ -450,5 +451,12 @@ class WeightRegularization(Layer):
         # Weight regularization
         if isinstance(self.regularizer, L2) and model.layers[layer + 1].is_trainable:
             # regularize dweights of next layer
-            model.layers[layer + 1].dweights,  model.layers[layer + 1].dbias = self.regularizer.regularize(model.batch_size, model.layers[layer + 1].weights, model.layers[layer + 1].dweights, model.layers[layer + 1].dbias)        
+            model.layers[layer + 1].dweights,  model.layers[layer + 1].dbias = self.regularizer.regularize_dweights(model.batch_size, model.layers[layer + 1].weights, model.layers[layer + 1].dweights, model.layers[layer + 1].dbias)        
         return dOut0
+
+    def LossRegularization(self, model, layer):
+        out = 0
+        # Loss regularization
+        if isinstance(self.regularizer, L2) and model.layers[layer + 1].is_trainable:
+            out = self.regularizer.regularize_loss(model.layers[layer + 1].weights)
+        return out

@@ -3,7 +3,7 @@ import pandas as pd
 import importlib
 from timeit import default_timer as timer
 from ArtNet.lib import printProgressBar
-from ArtNet.layers import Layer, Input
+from ArtNet.layers import Layer, Input, WeightRegularization
 
 class Sequential:
     """ Neural Network Model """
@@ -95,7 +95,7 @@ class Sequential:
                     self.batch_size = batch_size
                     suffix += ' - val_loss: {:.4f}'.format(np.round(val_loss, 4))
                     if 'accuracy' in self.metrics:   
-                        suffix += ' - val_acc: {:1.4f}'.format(np.round(self.lossf.accuracy(self.layers[self.n_layers].output, validation_data[1]), 4))
+                        suffix += ' - val_acc: {:1.4f}'.format(np.round(self.lossf.accuracy(self.layers[self.n_layers].output, validation_data[1].T), 4))
                     printProgressBar(i + 1, num_batches, prefix = prefix, suffix = suffix, length = np.min((30, num_batches)), timer = difftime) if verbose == 1 else None
             print() if verbose == 1 else None
 
@@ -103,7 +103,6 @@ class Sequential:
         self.is_train = False
         self.batch_size = batch_size
         x, y = self._prepData(x, y)
-        #self.layers[0].n_nodes = x.shape[self.nodes_axis]
         # batches
         num_batches = int(x.shape[self.samples_axis] / self.batch_size)
         val_x_batches = self._prepBatches(x, num_batches, axis=self.samples_axis)
@@ -155,7 +154,15 @@ class Sequential:
         return np.split(data, num_batches, axis=axis)  
 
     def _computeLoss(self, y):
-        return self.lossf.L(self.layers[self.n_layers].output, y)
+        loss = self.lossf.L(self.layers[self.n_layers].output, y, axis=self.samples_axis)
+        # loss regularization
+        regularization = 0
+        for layer in range(1, self.n_layers + 1):
+            if isinstance(self.layers[layer], WeightRegularization):
+                regularization += self.layers[layer].LossRegularization(self, layer)
+        regularization = 1/self.batch_size*regularization
+        loss += regularization
+        return loss
 
     def _doForwardProp(self, a0):
         self.layers[0].output = a0
@@ -166,6 +173,7 @@ class Sequential:
     def _doBackwardProp(self, y):
         # compute dA[L]
         dA = self.lossf.L_prime(self.layers[self.n_layers].output, y)
+        #assert(dA.shape == self.layers[self.n_layers].shape)
         # do back-prop
         for layer in range(self.n_layers, 0, -1):
             dA = self.layers[layer].Backward(self, layer, dA)
