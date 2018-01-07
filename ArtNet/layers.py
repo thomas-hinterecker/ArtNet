@@ -29,31 +29,15 @@ class Layer:
         model.layers.append(self)
 
     def onStart(self, model):
-        if model.is_train:
-            if self.shape is None:
-                self.shape = model.layers[self.n_layer - 1].shape
-            #
-            if self.is_trainable:
-                n_nodes0 = model.layers[self.n_layer - 1].shape[model.nodes_axis]
-                self.weights = self.weight_initializer.initialize((self.shape[model.nodes_axis], n_nodes0))
-                self.bias = self.bias_initializer.initialize((self.shape[model.nodes_axis], 1))
-                assert(self.weights.shape == (self.shape[model.nodes_axis], n_nodes0))
-                assert(self.bias.shape == (self.shape[model.nodes_axis], 1))   
-
-    # def onAdd(self, model):
-    #     model.n_layers += 1
-    #     self.n_layer = model.n_layers
-
-    #     if self.n_layer > 0 and self.n_nodes == -1:
-    #         self.n_nodes = model.layers[self.n_layer - 1].n_nodes
-
-    #     model.layers.append(self)
-
-    # def onStart(self, model):
-    #     if self.is_trainable:
-    #         n_nodes0 = model.layers[self.n_layer - 1].n_nodes
-    #         self.weights = self.weight_initializer.initialize((self.n_nodes, n_nodes0))
-    #         self.bias = self.bias_initializer.initialize((self.n_nodes, 1))
+        if self.output_shape is None:
+            self.output_shape = model.layers[self.n_layer - 1].output_shape
+        #
+        if self.is_trainable and model.is_train:
+            n_nodes0 = model.layers[self.n_layer - 1].output_shape[model.nodes_axis]
+            self.weights = self.weight_initializer.initialize((self.output_shape[model.nodes_axis], n_nodes0))
+            self.bias = self.bias_initializer.initialize((self.output_shape[model.nodes_axis], 1))
+            assert(self.weights.shape == (self.output_shape[model.nodes_axis], n_nodes0))
+            assert(self.bias.shape == (self.output_shape[model.nodes_axis], 1))
 
     def onEpochStart(self, model):
         pass
@@ -69,10 +53,7 @@ class Input(Layer):
     """Input layer"""
 
     def __init__(self, input_shape=1):
-        if not isinstance(input_shape, (list, tuple)):
-            input_shape = (input_shape,)
-        self.shape = input_shape
-        #self.n_nodes = input_shape
+        self.output_shape = (input_shape,) if not isinstance(input_shape, (list, tuple)) else tuple(reversed(input_shape))
 
     def onStart(self, model):
         self.output_shape = self.output_shape + (model.batch_size,)
@@ -95,15 +76,13 @@ class Trainable(Layer):
 
 class Dense(Trainable):
     """Dense neural network layer"""
-
     activation = None
     weight_initializer = None
     bias_initializer = None
     weight_regularizer = None
 
     def __init__(self, nodes, activation="Linear", weight_initializer='GlorotUniform', bias_initializer='Zeros', weight_regularizer=None):
-        #self.n_nodes = nodes
-        self.shape = (nodes, )
+        self.output_shape = (nodes, )
         self._InitLayer(activation, weight_initializer, bias_initializer, weight_regularizer)
 
     def onAdd(self, model):             
@@ -122,11 +101,12 @@ class Dense(Trainable):
     def Forward(self, model, layer):
         self.output = np.matmul(self.weights, model.layers[layer - 1].output) + self.bias
         if model.is_train:
-            assert(self.output.shape ==  self.shape)
+            assert(self.output.shape ==  self.output_shape)
+        return self.output
 
     def Backward(self, model, layer, dOut0):
         self.dweights = 1 / model.batch_size * np.matmul(dOut0, model.layers[layer - 1].output.T)
-        self.dbias = 1 / model.batch_size * np.sum(dOut0, keepdims=True)
+        self.dbias = np.squeeze(1 / model.batch_size * np.sum(dOut0, keepdims=True))
         dOut = np.matmul(self.weights.T, dOut0)
         assert(dOut.shape == model.layers[self.n_layer - 1].output_shape)
         assert(self.dweights.shape == self.weights.shape)
@@ -291,19 +271,6 @@ class MaxPooling2D(Conv2D):
         dOut = dOut.transpose(0,-1,1,2).reshape(self.input_data.shape[-1], self.input_data.shape[0], self.input_data.shape[1], self.input_data.shape[2]).transpose(1,3,2,0)
         #gen_image(dOut[0,:,:,0]).show()
         return dOut
-
-    def _CreateMaskFromWindow(self, x):
-        """
-        Creates a mask from an input matrix x, to identify the max entry of x.
-        
-        Arguments:
-        x -- Array of shape (f, f)
-        
-        Returns:
-        mask -- Array of the same shape as window, contains a True at the position corresponding to the max entry of x.
-        """
-        mask = x == np.max(x)
-        return mask
 
 class Flatten(Layer):
 

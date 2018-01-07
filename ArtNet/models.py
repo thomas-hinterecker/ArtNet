@@ -153,7 +153,7 @@ class Sequential:
         return np.split(data, num_batches, axis=axis)  
 
     def _computeLoss(self, y):
-        loss = self.lossf.L(self.layers[self.n_layers].output, y, axis=self.samples_axis)
+        loss = self.lossf.L(self.layers[self.n_layers].output, y)
         # loss regularization
         regularization = 0
         for layer in range(1, self.n_layers + 1):
@@ -172,7 +172,6 @@ class Sequential:
     def _doBackwardProp(self, y):
         # compute dA[L]
         dA = self.lossf.L_prime(self.layers[self.n_layers].output, y)
-        #assert(dA.shape == self.layers[self.n_layers].shape)
         # do back-prop
         for layer in range(self.n_layers, 0, -1):
             dA = self.layers[layer].Backward(self, layer, dA)

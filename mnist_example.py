@@ -17,7 +17,6 @@ mnist.target = lb.transform(mnist.target)
 
 x_train, x_test, y_train, y_test = train_test_split(mnist.data/255, mnist.target, test_size=0.2)
 #input_shape = img_rows * img_cols
-print(x_train.shape)
 #x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
 #x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
 #input_shape = (img_rows, img_cols, 1)
@@ -40,8 +39,8 @@ model.add(Dense(nodes=128, activation=ReLU(), weight_regularizer=L2()))
 #model.add(Conv2D(filters=1, kernel_size=(3, 3), padding="same", activation="ReLU", weight_initializer='GlorotUniform')) #
 #model.add(Activation(ReLU()))
 #model.add(MaxPooling2D(strides=(2, 2)))
-model.add(Flatten())
-model.add(Dense(nodes=128, activation=ReLU()))
+#model.add(Flatten())
+#model.add(Dense(nodes=128, activation=ReLU()))
 model.add(Dense(nodes=10, activation=Softmax()))
 model.compile(loss=CategoricalCrossEntropy(), optimizer=Adam(), metrics=["accuracy"])
 model.fit(x_train, y_train, epochs=2, batch_size=200, validation_data=(x_test, y_test))
