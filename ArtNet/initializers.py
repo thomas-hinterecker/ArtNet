@@ -41,7 +41,7 @@ class GlorotNormal(Initializer):
 
     def initialize(self, shape):
         np.random.seed(self.seed) if self.seed is not None else None
-        return np.random.standard_normal(shape) * np.square(2.0 / (shape[1] + shape[0]))
+        return np.random.standard_normal(shape) * np.square(2.0 / (shape[0] + shape[1]))
 
 class GlorotUniform(Initializer):
 
@@ -52,4 +52,4 @@ class GlorotUniform(Initializer):
 
     def initialize(self, shape):
         np.random.seed(self.seed) if self.seed is not None else None
-        return np.random.standard_normal(shape) * np.square(6.0 / (shape[1] + shape[0]))
+        return np.random.standard_normal(shape) * np.square(6.0 / (shape[0] + shape[1]))

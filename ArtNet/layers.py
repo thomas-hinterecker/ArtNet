@@ -1,11 +1,13 @@
 import numpy as np
 import importlib
 from ArtNet.regularizers import Regularizer, L2
+from ArtNet.lib import gen_image
 
 class Layer:
     """Layer class"""
 
-    shape = None
+    output_shape = None
+    #
     n_layer = 0
     #n_nodes = -1
     # Output variable
@@ -73,10 +75,7 @@ class Input(Layer):
         #self.n_nodes = input_shape
 
     def onStart(self, model):
-        if model.samples_axis == 0:
-            self.shape = (model.batch_size,) + self.shape
-        else:
-            self.shape = self.shape + (model.batch_size,)
+        self.output_shape = self.output_shape + (model.batch_size,)
 
 class Trainable(Layer):
 
@@ -117,10 +116,7 @@ class Dense(Trainable):
             model.add(Activation(activation=self.activation))
 
     def onStart(self, model):
-        if model.samples_axis == 0:
-            self.shape = (model.batch_size,) + self.shape
-        else:
-            self.shape = self.shape + (model.batch_size,)
+        self.output_shape = self.output_shape + (model.batch_size,)
         super(Dense, self).onStart(model)
 
     def Forward(self, model, layer):
@@ -132,176 +128,168 @@ class Dense(Trainable):
         self.dweights = 1 / model.batch_size * np.matmul(dOut0, model.layers[layer - 1].output.T)
         self.dbias = 1 / model.batch_size * np.sum(dOut0, keepdims=True)
         dOut = np.matmul(self.weights.T, dOut0)
-        assert (dOut.shape == model.layers[self.n_layer - 1].shape)
-        assert (self.dweights.shape == self.weights.shape)
-        assert (isinstance(self.dbias, np.ndarray))
+        assert(dOut.shape == model.layers[self.n_layer - 1].output_shape)
+        assert(self.dweights.shape == self.weights.shape)
+        assert(isinstance(self.dbias, np.ndarray))
         return dOut
 
 class Conv2D(Trainable):
     """2-D convolutional layer"""
 
     ##
-    kernel_size_size = None
+    kernel_size = None
     strides = None
     padding = 'valid'
+    ##
     paddings = None
     paddings_tuple = None
     data_format = None
     ##
-    output_vertical = None
-    output_horizontal = None
+    output_height = None
+    output_width = None
+    output_channels = None
+    #
+    input_data = None
+    input_data_column_vector = None
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='valid', data_format=None, activation="Linear", weight_initializer='GlorotUniform', bias_initializer='Zeros', weight_regularizer=None):
-        self.shape = (filters, )
-        self.kernel_size= kernel_size
+        self.output_shape = (filters, )
+        self.kernel_size = kernel_size
         self.strides = strides
         self.padding = padding
+        # init layer stuff
         self._InitLayer(activation=activation, weight_initializer=weight_initializer, bias_initializer=bias_initializer, weight_regularizer=weight_regularizer)
 
     def onStart(self, model):
-        input_shape = model.layers[self.n_layer - 1].shape
-
+        input_channels, input_width, input_height, m = model.layers[self.n_layer - 1].output_shape
+        # set paddings
         self.paddings = np.zeros_like(self.kernel_size)
         if self.padding == 'same':
             self.paddings[0] = (self.kernel_size[0] - 1 * self.strides[0]) / 2
             self.paddings[1] = (self.kernel_size[1] - 1 * self.strides[1]) / 2
-            if self.data_format == "channels_first":
-                self.paddings_tuple = ((0, 0), (0, 0), (self.paddings[0], self.paddings[0]), (self.paddings[1], self.paddings[1]))
-                vertical_size = input_shape[2]
-                horizontal_size = input_shape[3]
-                n_filters0 = input_shape[1]
-            else:
-                self.paddings_tuple = ((0, 0), (self.paddings[0], self.paddings[0]), (self.paddings[1], self.paddings[1]), (0, 0))
-                vertical_size = input_shape[1]
-                horizontal_size = input_shape[2]
-                n_filters0 = input_shape[3]
-
-        self.output_vertical = int(np.floor((vertical_size + 2 * self.paddings[0] - self.kernel_size[0]) / self.strides[0] + 1))
-        self.output_horizontal = int(np.floor((horizontal_size + 2 * self.paddings[1] - self.kernel_size[1]) / self.strides[1] + 1))
-
-        self.shape = (model.batch_size, self.output_vertical, self.output_horizontal, self.shape[-1])
-
-        self.weights = self.weight_initializer.initialize((self.kernel_size[0], self.kernel_size[1], n_filters0, self.shape[-1]))
-        self.bias = self.bias_initializer.initialize((1, 1, 1, self.shape[-1]))
+        self.paddings_tuple = ((0, 0), (self.paddings[0], self.paddings[0]), (self.paddings[1], self.paddings[1]), (0, 0))
+        # get output dimensions
+        assert (input_height + 2 * self.paddings[0] - self.kernel_size[0]) % self.strides[0] == 0
+        assert (input_width + 2 * self.paddings[1] - self.kernel_size[1]) % self.strides[1] == 0        
+        self.output_height = int(np.floor((input_height + 2 * self.paddings[0] - self.kernel_size[0]) / self.strides[0] + 1))
+        self.output_width = int(np.floor((input_width + 2 * self.paddings[1] - self.kernel_size[1]) / self.strides[1] + 1))
+        self.output_channels = self.output_shape[0]
+        # set output shape
+        self.output_shape = (self.output_channels, self.output_width, self.output_height, m)
+        # initialize weight and bias matrices
+        self.weights = self.weight_initializer.initialize((self.output_channels, input_channels, self.kernel_size[0], self.kernel_size[1]))
+        self.bias = self.bias_initializer.initialize((self.output_channels, 1))
         
     def Forward(self, model, layer):
-        input = model.layers[layer - 1].output
-        padded_input = np.pad(input, self.paddings_tuple, 'constant', constant_values=0)    
-        self.output = np.zeros(self.shape)
-        for sample in range(model.batch_size):                                 
-            #padded_sample = padded_input[..., sample]
-            for v in range(int(self.output_vertical / self.strides[0])):
-                for h in range(int(self.output_horizontal / self.strides[1])): 
-                    for f in range(self.shape[-1]):
-                        # Find the corners of the current "slice"
-                        vert_start = v * self.strides[0]
-                        vert_end = vert_start + self.kernel_size[0]
-                        horiz_start = h * self.strides[1]
-                        horiz_end = horiz_start + self.kernel_size[1]
-                        # Use the corners to define the (3D) slice of slice_sample
-                        sliced_sample = padded_input[sample, vert_start:vert_end, horiz_start:horiz_end, :]
-                        # Convolve the (3D) slice with the correct filter W and bias b, to get back one output neuron
-                        self.output[sample, v, h, f] = self._StridedConvolution(sliced_sample, self.weights[..., f], self.bias[..., f])
+        self.input_data = model.layers[layer - 1].output
+        #
+        self.input_data_column_vector = self.Matrix2Column(self.input_data.T)
+        weights_colum_vector = self.weights.reshape(self.output_channels, -1)
+        #
+        out = np.matmul(weights_colum_vector, self.input_data_column_vector) + self.bias
+        self.output  = out.reshape((self.output_shape[0], self.output_shape[1], self.output_shape[2], model.batch_size))
+        #
         return self.output
-
-    def _StridedConvolution(self, slice, W, b):
-        return np.sum(np.multiply(slice, W) + b)
-
+    
     def Backward(self, model, layer, dOut0):
-        input = model.layers[layer - 1].output
+        dOut0 = dOut0.T
+        self.dbias = np.sum(dOut0, axis=(0, 1, 2))
+        self.dbias = self.dbias.reshape(self.output_channels, -1)
         #
-        dOut = np.zeros_like(input)
-        self.dweights = np.zeros_like(self.weights)
-        self.dbias = np.zeros_like(self.bias)
+        dOut0_reshaped = dOut0.transpose(3, 1, 2, 0).reshape(self.output_channels, -1)
+        self.dweights = np.matmul(dOut0_reshaped, self.input_data_column_vector.T)
+        self.dweights = self.dweights.reshape(self.weights.shape)
         #
-        
-        padded_input = np.pad(input, self.paddings_tuple, 'constant', constant_values=0)    
-        padded_dOut = np.pad(dOut, self.paddings_tuple, 'constant', constant_values=0)    
-        #
-        for sample in range(model.batch_size):                                 
-            for v in range(int(self.output_vertical / self.strides[0])):
-                for h in range(int(self.output_horizontal / self.strides[1])): 
-                    for f in range(self.shape[-1]):
-                        # Find the corners of the current "slice"
-                        vert_start = v * self.strides[0]
-                        vert_end = vert_start + self.kernel_size[0]
-                        horiz_start = h * self.strides[1]
-                        horiz_end = horiz_start + self.kernel_size[1]                        
-                        #
-                        sliced_sample = padded_input[sample, vert_start:vert_end, horiz_start:horiz_end, :]
-                        # Update gradients for the window and the filter's parameters
-                        padded_dOut[sample, vert_start:vert_end, horiz_start:horiz_end, :] += self.weights[:, :, :, f] * dOut0[sample, v, h, f]
-                        self.dweights[:, :, :, f] += sliced_sample * dOut0[sample, v, h, f]
-                        self.dbias[:, :, :, f] += dOut0[sample, v, h, f]
-            # Set to unpaded data
-            dOut[sample, :, :, :] = padded_dOut[sample, self.paddings[0]:-self.paddings[0], self.paddings[1]:-self.paddings[1], :]
+        weights_reshaped = self.weights.reshape(self.output_channels, -1)
+        dOut_col = np.matmul(weights_reshaped.T, dOut0_reshaped)
+        out = self.Column2Matrix(dOut_col, self.input_data.shape)
+        return out
 
-        return dOut
+    def Matrix2Column(self, x):
+        x_padded = np.pad(x, self.paddings_tuple, mode='constant')
+        k, i, j = self.Matrix2ColumnIndices(x.shape)
+        cols = x_padded[:, j, i, k]
+        cols = cols.transpose(1, 2, 0).reshape(self.kernel_size[0] * self.kernel_size[1] * x.shape[-1], -1)
+        return cols
 
-class MaxPooling2D(Layer):
+    def Matrix2ColumnIndices(self, x_shape):
+        N, W, H, C = x_shape
+        out_height = int((H + 2 * self.paddings[0] - self.kernel_size[0]) / self.strides[0] + 1)
+        out_width = int((W + 2 * self.paddings[1] - self.kernel_size[1]) / self.strides[1] + 1)
+        i0 = np.repeat(np.arange(self.kernel_size[0]), self.kernel_size[1])
+        i0 = np.tile(i0, C)
+        i1 = self.strides[0] * np.repeat(np.arange(out_height), out_width)
+        j0 = np.tile(np.arange(self.kernel_size[1]), self.kernel_size[0] * C)
+        j1 = self.strides[1] * np.tile(np.arange(out_width), out_height)
+        i = i0.reshape(-1, 1) + i1.reshape(1, -1)
+        j = j0.reshape(-1, 1) + j1.reshape(1, -1)
+        k = np.repeat(np.arange(C), self.kernel_size[0] * self.kernel_size[1]).reshape(-1, 1)
+        return (k, i, j)    
 
-    pool_size = None
-    strides = None
-    padding = None
-    data_format = None
+    def Column2Matrix(self, cols, x_shape):
+        N, H, W, C = x_shape
+        H_padded, W_padded = H + 2 * self.paddings[0], W + 2 * self.paddings[1]
+        x_padded = np.zeros((N, H_padded, W_padded, C), dtype=cols.dtype)
+        k, i, j = self.Matrix2ColumnIndices(x_shape)
+        cols_reshaped = cols.reshape(self.kernel_size[0] * self.kernel_size[1] * C, -1, N)
+        cols_reshaped = cols_reshaped.transpose(2, 0, 1)
+        np.add.at(x_padded, (slice(None), j, i, k), cols_reshaped)
+        if self.paddings[0] == 0 and self.paddings[1] == 0:
+            return x_padded
+        return x_padded[:, self.paddings[0]:-self.paddings[0], self.paddings[1]:-self.paddings[1], :]
 
-    def __init__(self, pool_size=(2, 2), strides=None, padding='valid', data_format=None):
-        self.pool_size = pool_size
-        self.strides= strides
+class MaxPooling2D(Conv2D):
+  
+    max_idx = None
+
+    def __init__(self, pool_size=(2, 2), strides=None, padding='valid'):
+        self.kernel_size = pool_size
+        self.strides = strides
         self.padding = padding
-        self.data_format = data_format
 
     def onStart(self, model):
-        input_shape = model.layers[self.n_layer - 1].shape
+        input_channels, input_width, input_height, m = model.layers[self.n_layer - 1].output_shape
+        #
+        self.paddings = np.zeros_like(self.kernel_size)
+        self.paddings_tuple = ((0, 0), (0, 0), (self.paddings[0], self.paddings[0]), (self.paddings[1], self.paddings[1]))
+        # get output dimensions
+        assert (input_height + 2 * self.paddings[0] - self.kernel_size[0]) % self.strides[0] == 0
+        assert (input_width + 2 * self.paddings[1] - self.kernel_size[1]) % self.strides[1] == 0        
+        self.output_height = int(np.floor((input_height + 2 * self.paddings[0] - self.kernel_size[0]) / self.strides[0] + 1))
+        self.output_width = int(np.floor((input_width + 2 * self.paddings[1] - self.kernel_size[1]) / self.strides[1] + 1))
+        self.output_channels = input_channels
+        # set output shape
+        self.output_shape = (self.output_channels, self.output_width, self.output_height, m)
 
-        paddings = np.zeros_like(self.pool_size)
-        if self.data_format == "channels_first":
-            vertical_size = input_shape[2]
-            horizontal_size = input_shape[3]
-            n_filters0 = input_shape[1]
-        else:
-            vertical_size = input_shape[1]
-            horizontal_size = input_shape[2]
-            n_filters0 = input_shape[3]
-
-        self.output_vertical = int(np.floor((vertical_size + 2 * paddings[0] - self.pool_size[0]) / self.strides[0] + 1))
-        self.output_horizontal = int(np.floor((horizontal_size + 2 * paddings[1] - self.pool_size[1]) / self.strides[1] + 1))
-
-        self.shape = (model.batch_size, self.output_vertical, self.output_horizontal, n_filters0)
-        
     def Forward(self, model, layer):
-        input = model.layers[layer - 1].output
-        self.output = np.zeros(self.shape)
-        for sample in range(model.batch_size):                                 
-            for v in range(int(self.output_vertical / self.strides[0])):
-                for h in range(int(self.output_horizontal / self.strides[1])): 
-                    for f in range(self.shape[-1]):
-                        # Find the corners of the current "slice"
-                        vert_start = v * self.strides[0]
-                        vert_end = vert_start + self.pool_size[0]
-                        horiz_start = h * self.strides[1]
-                        horiz_end = horiz_start + self.pool_size[1]
-                        # Use the corners to define the (3D) slice
-                        slice_sample = input[sample, vert_start:vert_end, horiz_start:horiz_end, f]
-                        # Max pooling
-                        self.output[sample, v, h, f] = np.max(slice_sample)
-        return self.output
+        self.input_data = model.layers[layer - 1].output
+        #gen_image(self.input_data[0,:,:,0]).show()
+        # Reshape it to make im2col arranges it fully in column
+        input_data_reshaped = self.input_data.T.reshape(self.input_data.shape[-1] * self.input_data.shape[0], self.input_data.shape[1], self.input_data.shape[2], 1)
+        #gen_image(input_data_reshaped.T[0,:,:,0]).show()
+        self.input_data_column_vector = self.Matrix2Column(input_data_reshaped)
+        # Next, at each possible patch location, i.e. at each column, we're taking the max index
+        self.max_idx = np.argmax(self.input_data_column_vector, axis=0)
+        # Finally, we get all the max value at each column
+        out = self.input_data_column_vector[self.max_idx, range(self.max_idx.size)]
+        # Reshape to the output size
+        out = out.reshape((self.output_shape[2], self.output_shape[1], model.batch_size, self.output_shape[0]))
+        self.output = out.transpose(3, 0, 1, 2)
+        #gen_image(self.output[0,:,:,0], shape=(14, 14)).show()
+        return self.output  
 
     def Backward(self, model, layer, dOut0):
-        dOut = np.zeros(model.layers[self.n_layer - 1].shape)
-        for sample in range(model.batch_size):                                 
-            for v in range(int(self.output_vertical / self.strides[0])):
-                for h in range(int(self.output_horizontal / self.strides[1])): 
-                    for f in range(self.shape[-1]): 
-                        # Find the corners of the current "slice"
-                        vert_start = v * self.strides[0]
-                        vert_end = vert_start + self.pool_size[0]
-                        horiz_start = h * self.strides[1]
-                        horiz_end = horiz_start + self.pool_size[1]       
-                        # Use the corners and "c" to define the current slice from a_prev
-                        slice_sample = dOut0[sample, vert_start:vert_end, horiz_start:horiz_end, f]
-                        mask = self._CreateMaskFromWindow(slice_sample)
-                        dOut[sample, vert_start:vert_end, horiz_start:horiz_end, f] += np.multiply(mask, dOut0[sample, v, h, f])  
+        #gen_image(dOut0[0,:,:,0], shape=(14, 14)).show()
+        dOut_column_vector = np.zeros_like(self.input_data_column_vector)
+        # Transpose step is necessary to get the correct arrangement
+        dOut0_flat = dOut0.transpose(1, 2, -1, 0).ravel()
+        # Fill the maximum index of each column with the gradient
+        dOut_column_vector[self.max_idx, range(self.max_idx.size)] = dOut0_flat
+        # We now have the stretched matrix of 4x9800, then undo it with col2im operation
+        dOut = self.Column2Matrix(dOut_column_vector, (self.input_data.shape[-1] * self.input_data.shape[0], self.input_data.shape[1], self.input_data.shape[2], 1))
+        # Reshape back to match the input dimension
+        dOut = dOut.transpose(0,-1,1,2).reshape(self.input_data.shape[-1], self.input_data.shape[0], self.input_data.shape[1], self.input_data.shape[2]).transpose(1,3,2,0)
+        #gen_image(dOut[0,:,:,0]).show()
         return dOut
 
     def _CreateMaskFromWindow(self, x):
@@ -320,19 +308,19 @@ class MaxPooling2D(Layer):
 class Flatten(Layer):
 
     def onStart(self, model):
-        input_shape = model.layers[self.n_layer - 1].shape
+        input_shape = model.layers[self.n_layer - 1].output_shape
         n_nodes = 1
-        for i in range(1, len(input_shape)):
+        for i in range(0, len(input_shape) - 1):
             n_nodes *= input_shape[i]
-        self.shape = (model.batch_size, n_nodes)
+        self.output_shape = (n_nodes, model.batch_size)
 
     def Forward(self, model, layer):
         input = model.layers[self.n_layer - 1].output
-        self.output = input.reshape(self.shape)
+        self.output = input.reshape((self.output_shape[0], -1))
         return self.output
 
     def Backward(self, model, layer, dOut0):
-        return dOut0.reshape(model.layers[self.n_layer - 1].shape)
+        return dOut0.reshape(model.layers[self.n_layer - 1].output_shape)
 
 class BatchNormalization(Layer):
     """Batch normalization layer"""
@@ -421,19 +409,19 @@ class Dropout(Layer):
         self.seed = seed
 
     def onEpochStart(self, model):
-        n_nodes0 = model.layers[self.n_layer - 1].n_nodes
+        n_nodes0 = model.layers[self.n_layer - 1].output_shape[0]
         np.random.seed(seed) if self.seed is not None else None
         self.dropout = np.random.randn(n_nodes0, model.batch_size) < self.keep_prob
 
     def Forward(self, model, layer):
-        a0 = model.layers[layer - 1].output
+        input_data = model.layers[layer - 1].output
         if model.is_train:
-            A = np.multiply(a0, self.dropout)
-            A /= self.keep_prob
+            out = np.multiply(input_data, self.dropout)
+            out /= self.keep_prob
         else:
-            A = a0
-
-        return A
+            out = input_data
+        self.output = out
+        return out
 
 class WeightRegularization(Layer):
     """Weight regularization"""

@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Print iterations progress
 def printProgressBar (iteration, total, prefix = '', suffix = '', length = 100, timer = 0.0, fill = '='):
@@ -27,3 +28,8 @@ def r_squared(y_true, y_pred):
     ss_tot= np.sum(np.square(y_true - np.mean(y_true)))
 
     return 1 - ss_res / ss_tot
+
+def gen_image(arr, shape=(28, 28)):
+    two_d = (np.reshape(arr, shape) * 255).astype(np.uint8)
+    plt.imshow(two_d, interpolation='nearest')
+    return plt

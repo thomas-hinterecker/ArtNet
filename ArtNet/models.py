@@ -9,7 +9,7 @@ class Sequential:
     """ Neural Network Model """
 
     ##
-    samples_axis = 1
+    samples_axis = -1
     nodes_axis = 0
 
     ##
@@ -117,7 +117,6 @@ class Sequential:
         self.batch_size = batch_size
         x, y = self._prepData(x)
         n_samples = x.shape[self.samples_axis]
-        self.layers[0].n_nodes = X.shape[0]
         # batches
         num_batches = int(n_samples / self.batch_size)
         x_batches = self._prepBatches(X, num_batches, axis=self.samples_axis)
