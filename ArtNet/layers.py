@@ -38,11 +38,16 @@ class Layer:
             self.output_shape = model.layers[self.n_layer - 1].output_shape
         #
         if self.is_trainable and model.is_train:
-            n_nodes0 = model.layers[self.n_layer - 1].output_shape[model.nodes_axis]
-            self.weights = self.weight_initializer.initialize((self.output_shape[model.nodes_axis], n_nodes0))
-            self.bias = self.bias_initializer.initialize((self.output_shape[model.nodes_axis], 1))
-            assert (self.weights.shape == (self.output_shape[model.nodes_axis], n_nodes0))
-            assert (self.bias.shape == (self.output_shape[model.nodes_axis], 1))
+            n_nodes0 = model.layers[self.n_layer -
+                                    1].output_shape[model.nodes_axis]
+            self.weights = self.weight_initializer.initialize(
+                (self.output_shape[model.nodes_axis], n_nodes0))
+            self.bias = self.bias_initializer.initialize(
+                (self.output_shape[model.nodes_axis], 1))
+            assert (self.weights.shape == (
+                self.output_shape[model.nodes_axis], n_nodes0))
+            assert (self.bias.shape == (
+                self.output_shape[model.nodes_axis], 1))
 
     def onEpochStart(self, model):
         pass
@@ -73,11 +78,13 @@ class Trainable(Layer):
                    weight_regularizer=None):
         self.activation = activation
         if type(weight_initializer) == str:
-            weight_initializer_class = getattr(importlib.import_module("ArtNet.initializers"), weight_initializer)
+            weight_initializer_class = getattr(importlib.import_module(
+                "ArtNet.initializers"), weight_initializer)
             weight_initializer = weight_initializer_class()
         self.weight_initializer = weight_initializer
         if type(bias_initializer) == str:
-            bias_initializer_class = getattr(importlib.import_module("ArtNet.initializers"), bias_initializer)
+            bias_initializer_class = getattr(importlib.import_module(
+                "ArtNet.initializers"), bias_initializer)
             bias_initializer = bias_initializer_class()
         self.bias_initializer = bias_initializer
         self.weight_regularizer = weight_regularizer
@@ -93,7 +100,8 @@ class Dense(Trainable):
     def __init__(self, nodes, activation="Linear", weight_initializer='GlorotUniform', bias_initializer='Zeros',
                  weight_regularizer=None):
         self.output_shape = (nodes,)
-        self._InitLayer(activation, weight_initializer, bias_initializer, weight_regularizer)
+        self._InitLayer(activation, weight_initializer,
+                        bias_initializer, weight_regularizer)
 
     def onAdd(self, model):
         if self.weight_regularizer is not None:
@@ -109,14 +117,17 @@ class Dense(Trainable):
         super(Dense, self).onStart(model)
 
     def Forward(self, model, layer):
-        self.output = np.matmul(self.weights, model.layers[layer - 1].output) + self.bias
+        self.output = np.matmul(
+            self.weights, model.layers[layer - 1].output) + self.bias
         if model.is_train:
             assert (self.output.shape == self.output_shape)
         return self.output
 
     def Backward(self, model, layer, dOut0):
-        self.dweights = 1 / model.batch_size * np.matmul(dOut0, model.layers[layer - 1].output.T)
-        self.dbias = np.squeeze(1 / model.batch_size * np.sum(dOut0, keepdims=True))
+        self.dweights = 1 / model.batch_size * \
+            np.matmul(dOut0, model.layers[layer - 1].output.T)
+        self.dbias = np.squeeze(1 / model.batch_size *
+                                np.sum(dOut0, keepdims=True))
         dOut = np.matmul(self.weights.T, dOut0)
         assert (dOut.shape == model.layers[self.n_layer - 1].output_shape)
         assert (self.dweights.shape == self.weights.shape)
@@ -163,15 +174,18 @@ class Conv2D(Trainable):
         self.paddings_tuple = (
             (0, 0), (self.paddings[0], self.paddings[0]), (self.paddings[1], self.paddings[1]), (0, 0))
         # get output dimensions
-        assert (input_height + 2 * self.paddings[0] - self.kernel_size[0]) % self.strides[0] == 0
-        assert (input_width + 2 * self.paddings[1] - self.kernel_size[1]) % self.strides[1] == 0
+        assert (input_height + 2 *
+                self.paddings[0] - self.kernel_size[0]) % self.strides[0] == 0
+        assert (input_width + 2 *
+                self.paddings[1] - self.kernel_size[1]) % self.strides[1] == 0
         self.output_height = int(
             np.floor((input_height + 2 * self.paddings[0] - self.kernel_size[0]) / self.strides[0] + 1))
         self.output_width = int(
             np.floor((input_width + 2 * self.paddings[1] - self.kernel_size[1]) / self.strides[1] + 1))
         self.output_channels = self.output_shape[0]
         # set output shape
-        self.output_shape = (self.output_channels, self.output_width, self.output_height, m)
+        self.output_shape = (self.output_channels,
+                             self.output_width, self.output_height, m)
         # initialize weight and bias matrices
         self.weights = self.weight_initializer.initialize(
             (self.output_channels, input_channels, self.kernel_size[0], self.kernel_size[1]))
@@ -183,8 +197,10 @@ class Conv2D(Trainable):
         self.input_data_column_vector = self.Matrix2Column(self.input_data.T)
         weights_colum_vector = self.weights.reshape(self.output_channels, -1)
         #
-        out = np.matmul(weights_colum_vector, self.input_data_column_vector) + self.bias
-        self.output = out.reshape((self.output_shape[0], self.output_shape[1], self.output_shape[2], model.batch_size))
+        out = np.matmul(weights_colum_vector,
+                        self.input_data_column_vector) + self.bias
+        self.output = out.reshape(
+            (self.output_shape[0], self.output_shape[1], self.output_shape[2], model.batch_size))
         #
         return self.output
 
@@ -193,8 +209,10 @@ class Conv2D(Trainable):
         self.dbias = np.sum(dOut0, axis=(0, 1, 2))
         self.dbias = self.dbias.reshape(self.output_channels, -1)
         #
-        dOut0_reshaped = dOut0.transpose(3, 1, 2, 0).reshape(self.output_channels, -1)
-        self.dweights = np.matmul(dOut0_reshaped, self.input_data_column_vector.T)
+        dOut0_reshaped = dOut0.transpose(
+            3, 1, 2, 0).reshape(self.output_channels, -1)
+        self.dweights = np.matmul(
+            dOut0_reshaped, self.input_data_column_vector.T)
         self.dweights = self.dweights.reshape(self.weights.shape)
         #
         weights_reshaped = self.weights.reshape(self.output_channels, -1)
@@ -206,13 +224,16 @@ class Conv2D(Trainable):
         x_padded = np.pad(x, self.paddings_tuple, mode='constant')
         k, i, j = self.Matrix2ColumnIndices(x.shape)
         cols = x_padded[:, j, i, k]
-        cols = cols.transpose(1, 2, 0).reshape(self.kernel_size[0] * self.kernel_size[1] * x.shape[-1], -1)
+        cols = cols.transpose(1, 2, 0).reshape(
+            self.kernel_size[0] * self.kernel_size[1] * x.shape[-1], -1)
         return cols
 
     def Matrix2ColumnIndices(self, x_shape):
         N, W, H, C = x_shape
-        out_height = int((H + 2 * self.paddings[0] - self.kernel_size[0]) / self.strides[0] + 1)
-        out_width = int((W + 2 * self.paddings[1] - self.kernel_size[1]) / self.strides[1] + 1)
+        out_height = int(
+            (H + 2 * self.paddings[0] - self.kernel_size[0]) / self.strides[0] + 1)
+        out_width = int(
+            (W + 2 * self.paddings[1] - self.kernel_size[1]) / self.strides[1] + 1)
         i0 = np.repeat(np.arange(self.kernel_size[0]), self.kernel_size[1])
         i0 = np.tile(i0, C)
         i1 = self.strides[0] * np.repeat(np.arange(out_height), out_width)
@@ -220,7 +241,8 @@ class Conv2D(Trainable):
         j1 = self.strides[1] * np.tile(np.arange(out_width), out_height)
         i = i0.reshape(-1, 1) + i1.reshape(1, -1)
         j = j0.reshape(-1, 1) + j1.reshape(1, -1)
-        k = np.repeat(np.arange(C), self.kernel_size[0] * self.kernel_size[1]).reshape(-1, 1)
+        k = np.repeat(
+            np.arange(C), self.kernel_size[0] * self.kernel_size[1]).reshape(-1, 1)
         return (k, i, j)
 
     def Column2Matrix(self, cols, x_shape):
@@ -228,7 +250,8 @@ class Conv2D(Trainable):
         H_padded, W_padded = H + 2 * self.paddings[0], W + 2 * self.paddings[1]
         x_padded = np.zeros((N, H_padded, W_padded, C), dtype=cols.dtype)
         k, i, j = self.Matrix2ColumnIndices(x_shape)
-        cols_reshaped = cols.reshape(self.kernel_size[0] * self.kernel_size[1] * C, -1, N)
+        cols_reshaped = cols.reshape(
+            self.kernel_size[0] * self.kernel_size[1] * C, -1, N)
         cols_reshaped = cols_reshaped.transpose(2, 0, 1)
         np.add.at(x_padded, (slice(None), j, i, k), cols_reshaped)
         if self.paddings[0] == 0 and self.paddings[1] == 0:
@@ -251,15 +274,18 @@ class MaxPooling2D(Conv2D):
         self.paddings_tuple = (
             (0, 0), (0, 0), (self.paddings[0], self.paddings[0]), (self.paddings[1], self.paddings[1]))
         # get output dimensions
-        assert (input_height + 2 * self.paddings[0] - self.kernel_size[0]) % self.strides[0] == 0
-        assert (input_width + 2 * self.paddings[1] - self.kernel_size[1]) % self.strides[1] == 0
+        assert (input_height + 2 *
+                self.paddings[0] - self.kernel_size[0]) % self.strides[0] == 0
+        assert (input_width + 2 *
+                self.paddings[1] - self.kernel_size[1]) % self.strides[1] == 0
         self.output_height = int(
             np.floor((input_height + 2 * self.paddings[0] - self.kernel_size[0]) / self.strides[0] + 1))
         self.output_width = int(
             np.floor((input_width + 2 * self.paddings[1] - self.kernel_size[1]) / self.strides[1] + 1))
         self.output_channels = input_channels
         # set output shape
-        self.output_shape = (self.output_channels, self.output_width, self.output_height, m)
+        self.output_shape = (self.output_channels,
+                             self.output_width, self.output_height, m)
 
     def Forward(self, model, layer):
         self.input_data = model.layers[layer - 1].output
@@ -272,9 +298,11 @@ class MaxPooling2D(Conv2D):
         # Next, at each possible patch location, i.e. at each column, we're taking the max index
         self.max_idx = np.argmax(self.input_data_column_vector, axis=0)
         # Finally, we get all the max value at each column
-        out = self.input_data_column_vector[self.max_idx, range(self.max_idx.size)]
+        out = self.input_data_column_vector[self.max_idx, range(
+            self.max_idx.size)]
         # Reshape to the output size
-        out = out.reshape((self.output_shape[2], self.output_shape[1], model.batch_size, self.output_shape[0]))
+        out = out.reshape(
+            (self.output_shape[2], self.output_shape[1], model.batch_size, self.output_shape[0]))
         self.output = out.transpose(3, 0, 1, 2)
         # gen_image(self.output[0,:,:,0], shape=(14, 14)).show()
         return self.output
@@ -288,7 +316,8 @@ class MaxPooling2D(Conv2D):
         dOut_column_vector[self.max_idx, range(self.max_idx.size)] = dOut0_flat
         # We now have the stretched matrix of 4x9800, then undo it with col2im operation
         dOut = self.Column2Matrix(dOut_column_vector, (
-            self.input_data.shape[-1] * self.input_data.shape[0], self.input_data.shape[1], self.input_data.shape[2],
+            self.input_data.shape[-1] *
+            self.input_data.shape[0], self.input_data.shape[1], self.input_data.shape[2],
             1))
         # Reshape back to match the input dimension
         dOut = dOut.transpose(0, -1, 1, 2).reshape(self.input_data.shape[-1], self.input_data.shape[0],
@@ -336,12 +365,14 @@ class BatchNormalization(Layer):
         self.epsilon = epsilon
 
         if type(beta_initializer) == str:
-            beta_initializer_class = getattr(importlib.import_module("ArtNet.initializers"), beta_initializer)
+            beta_initializer_class = getattr(importlib.import_module(
+                "ArtNet.initializers"), beta_initializer)
             beta_initializer = beta_initializer_class()
         self.weight_initializer = beta_initializer
 
         if type(gamma_initializer) == str:
-            gamma_initializer_class = getattr(importlib.import_module("ArtNet.initializers"), gamma_initializer)
+            gamma_initializer_class = getattr(importlib.import_module(
+                "ArtNet.initializers"), gamma_initializer)
             gamma_initializer = gamma_initializer_class()
         self.bias_initializer = gamma_initializer
 
@@ -355,20 +386,23 @@ class BatchNormalization(Layer):
             sqrt_var = np.sqrt(var + self.epsilon)
             self.inv_var = 1.0 / sqrt_var
 
-            self.running_mu = self.momentum * self.running_mu + (1 - self.momentum) * self.mu
-            self.running_var = self.momentum * self.running_var + (1 - self.momentum) * var
+            self.running_mu = self.momentum * \
+                self.running_mu + (1 - self.momentum) * self.mu
+            self.running_var = self.momentum * \
+                self.running_var + (1 - self.momentum) * var
 
             self.normed = (a0 - self.mu) / sqrt_var
         else:
-            self.normed = (a0 - self.running_mu) / np.sqrt(self.running_var + self.epsilon)
+            self.normed = (a0 - self.running_mu) / \
+                np.sqrt(self.running_var + self.epsilon)
         self.output = np.matmul(self.weights, self.normed) + self.bias
         return self.output
 
     def Backward(self, model, layer, dOut0):
         dx_normed = np.matmul(self.weights.T, dOut0)
         dOut = (1.0 / model.batch_size) * self.inv_var * (
-                model.batch_size * dx_normed - np.sum(dx_normed, axis=0) - self.normed * np.sum(
-            dx_normed * self.normed, axis=0))
+            model.batch_size * dx_normed - np.sum(dx_normed, axis=0) - self.normed * np.sum(
+                dx_normed * self.normed, axis=0))
         self.dweights = 1 / model.batch_size * np.matmul(dOut0, self.normed.T)
         self.dbias = 1 / model.batch_size * np.sum(dOut0, keepdims=True)
         return dOut
@@ -381,7 +415,8 @@ class Activation(Layer):
 
     def __init__(self, activation="Linear"):
         if type(activation) == str:
-            activation_class = getattr(importlib.import_module("ArtNet.activations"), activation)
+            activation_class = getattr(importlib.import_module(
+                "ArtNet.activations"), activation)
             activation = activation_class()
         self.activation = activation
 
@@ -409,7 +444,8 @@ class Dropout(Layer):
     def onEpochStart(self, model):
         n_nodes0 = model.layers[self.n_layer - 1].output_shape[0]
         np.random.seed(self.seed) if self.seed is not None else None
-        self.dropout = np.random.randn(n_nodes0, model.batch_size) < self.keep_prob
+        self.dropout = np.random.randn(
+            n_nodes0, model.batch_size) < self.keep_prob
 
     def Forward(self, model, layer):
         input_data = model.layers[layer - 1].output
@@ -430,7 +466,8 @@ class WeightRegularization(Layer):
     def __init__(self, regularizer=None):
         # regularizer
         if type(self.regularizer) == str:
-            regularizer_class = getattr(importlib.import_module("ArtNet.regularizers"), self.regularizer)
+            regularizer_class = getattr(importlib.import_module(
+                "ArtNet.regularizers"), self.regularizer)
             regularizer = regularizer_class(regularizer_class)
         self.regularizer = regularizer
 
@@ -439,7 +476,8 @@ class WeightRegularization(Layer):
         if isinstance(self.regularizer, L2) and model.layers[layer + 1].is_trainable:
             # regularize dweights of next layer
             model.layers[layer + 1].dweights, model.layers[layer + 1].dbias = self.regularizer.regularize_dweights(
-                model.batch_size, model.layers[layer + 1].weights, model.layers[layer + 1].dweights,
+                model.batch_size, model.layers[layer +
+                                               1].weights, model.layers[layer + 1].dweights,
                 model.layers[layer + 1].dbias)
         return dOut0
 
@@ -447,5 +485,6 @@ class WeightRegularization(Layer):
         out = 0
         # Loss regularization
         if isinstance(self.regularizer, L2) and model.layers[layer + 1].is_trainable:
-            out = self.regularizer.regularize_loss(model.layers[layer + 1].weights)
+            out = self.regularizer.regularize_loss(
+                model.layers[layer + 1].weights)
         return out
