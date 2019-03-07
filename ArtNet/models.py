@@ -1,9 +1,12 @@
-import numpy as np
-import pandas as pd
 import importlib
 from timeit import default_timer as timer
+
+import numpy as np
+import pandas as pd
+
+from ArtNet.layers import Layer, WeightRegularization
 from ArtNet.lib import printProgressBar
-from ArtNet.layers import Layer, Input, WeightRegularization
+
 
 class Sequential:
     """ Neural Network Model """
@@ -17,15 +20,15 @@ class Sequential:
     batch_size = 32
     is_train = False
 
-    ## Layers
+    # Layers
     layers = []
     n_layers = -1
-    
+
     ##
     lossf = None
     optimizer = None
     metrics = None
-        
+
     def __init__(self):
         pass
 
@@ -37,12 +40,14 @@ class Sequential:
     def compile(self, loss="MeanSquaredError", optimizer="GradientDescent", metrics=None):
         # Loss function
         if type(loss) == str:
-            loss_function_class = getattr(importlib.import_module("ArtNet.losses"), loss)
+            loss_function_class = getattr(
+                importlib.import_module("ArtNet.losses"), loss)
             loss = loss_function_class()
         self.lossf = loss
         # Optimizer
         if type(optimizer) == str:
-            optimizer_class = getattr(importlib.import_module("ArtNet.optimizers"), optimizer)
+            optimizer_class = getattr(
+                importlib.import_module("ArtNet.optimizers"), optimizer)
             optimizer = optimizer_class()
         self.optimizer = optimizer
         # Metrics
@@ -53,22 +58,30 @@ class Sequential:
         self.batch_size = batch_size
         x, y = self._prepData(x, y)
         n_samples = x.shape[self.samples_axis]
-        [self.layers[layer].onStart(self) for layer in range(0, self.n_layers + 1)]
+        [self.layers[layer].onStart(self)
+         for layer in range(0, self.n_layers + 1)]
         # batch train
         num_batches = int(n_samples / self.batch_size)
-        test_x_batches = self._prepBatches(x, num_batches, axis=self.samples_axis)
-        test_y_batches = self._prepBatches(y, num_batches, axis=self.samples_axis)
+        test_x_batches = self._prepBatches(
+            x, num_batches, axis=self.samples_axis)
+        test_y_batches = self._prepBatches(
+            y, num_batches, axis=self.samples_axis)
         # Initialize the optimizer
         self.optimizer.init(self)
         # loop over epochs
         for epoch in range(0, epochs):
             self.epoch = epoch
-            [self.layers[layer].onEpochStart(self) for layer in range(1, self.n_layers + 1)]
+            [self.layers[layer].onEpochStart(self)
+             for layer in range(1, self.n_layers + 1)]
             # print
             if verbose == 1:
-                print('Epoch: ' + str(epoch + 1) + '/' + str(epochs)) if epoch > 0 else None
+                print('Epoch: ' + str(epoch + 1) + '/' +
+                      str(epochs)) if epoch > 0 else None
                 start_time = timer()
-                printProgressBar(0, num_batches, prefix = '{:{width}.0f}'.format(0, width=len(str(n_samples))) + '/' + str(n_samples) + ' -', suffix = '- loss:', length = np.min((30, num_batches)), timer = int(start_time))
+                printProgressBar(0, num_batches,
+                                 prefix='{:{width}.0f}'.format(0, width=len(str(n_samples))) + '/' + str(
+                                     n_samples) + ' -', suffix='- loss:', length=np.min((30, num_batches)),
+                                 timer=int(start_time))
             # loop over batches
             loss = 1
             for i in range(0, num_batches):
@@ -80,23 +93,30 @@ class Sequential:
                 # print
                 if verbose == 1:
                     difftime = int(np.round(timer() - start_time, 0))
-                    prefix = '{:{width}.0f}'.format(self.batch_size * (i + 1), width=len(str(n_samples))) + '/' + str(n_samples) + ' -'
+                    prefix = '{:{width}.0f}'.format(
+                        self.batch_size * (i + 1), width=len(str(n_samples))) + '/' + str(n_samples) + ' -'
                     suffix = '- loss: {:.4f}'.format(np.round(loss, 4))
                     if 'accuracy' in self.metrics:
-                        suffix += ' - acc: {:1.4f}'.format(np.round(self.lossf.accuracy(output, test_y_batches[i]), 4))
-                    printProgressBar(i + 1, num_batches, prefix = prefix, suffix = suffix + (' ' * 5), length = np.min((30, num_batches)), timer = difftime)
+                        suffix += ' - acc: {:1.4f}'.format(
+                            np.round(self.lossf.accuracy(output, test_y_batches[i]), 4))
+                    printProgressBar(i + 1, num_batches, prefix=prefix, suffix=suffix + (
+                            ' ' * 5), length=np.min((30, num_batches)), timer=difftime)
             # Learning rate decay
             self.optimizer.lr_decay(self)
             # Validation
             if validation_data is not None:
                 # print
                 if verbose == 1:
-                    val_loss = self.evaluate(validation_data[0], validation_data[1], batch_size=validation_data[0].shape[self.nodes_axis])
+                    val_loss = self.evaluate(
+                        validation_data[0], validation_data[1], batch_size=validation_data[0].shape[self.nodes_axis])
                     self.batch_size = batch_size
-                    suffix += ' - val_loss: {:.4f}'.format(np.round(val_loss, 4))
-                    if 'accuracy' in self.metrics:   
-                        suffix += ' - val_acc: {:1.4f}'.format(np.round(self.lossf.accuracy(self.layers[self.n_layers].output, validation_data[1].T), 4))
-                    printProgressBar(i + 1, num_batches, prefix = prefix, suffix = suffix, length = np.min((30, num_batches)), timer = difftime) if verbose == 1 else None
+                    suffix += ' - val_loss: {:.4f}'.format(
+                        np.round(val_loss, 4))
+                    if 'accuracy' in self.metrics:
+                        suffix += ' - val_acc: {:1.4f}'.format(np.round(self.lossf.accuracy(
+                            self.layers[self.n_layers].output, validation_data[1].T), 4))
+                    printProgressBar(i + 1, num_batches, prefix=prefix, suffix=suffix, length=np.min(
+                        (30, num_batches)), timer=difftime) if verbose == 1 else None
             print() if verbose == 1 else None
 
     def evaluate(self, x=None, y=None, batch_size=None, verbose=1):
@@ -105,8 +125,10 @@ class Sequential:
         x, y = self._prepData(x, y)
         # batches
         num_batches = int(x.shape[self.samples_axis] / self.batch_size)
-        val_x_batches = self._prepBatches(x, num_batches, axis=self.samples_axis)
-        val_y_batches = self._prepBatches(y, num_batches, axis=self.samples_axis)
+        val_x_batches = self._prepBatches(
+            x, num_batches, axis=self.samples_axis)
+        val_y_batches = self._prepBatches(
+            y, num_batches, axis=self.samples_axis)
         # loop over batches
         for i in range(0, num_batches):
             self._doForwardProp(val_x_batches[i])
@@ -124,17 +146,21 @@ class Sequential:
         # print
         if verbose == 1:
             start_time = timer()
-            printProgressBar(0, num_batches, prefix = '0/' + str(n_samples), suffix = '', length = 30, timer = int(start_time))
+            printProgressBar(0, num_batches, prefix='0/' + str(n_samples),
+                             suffix='', length=30, timer=int(start_time))
         # loop over batches
         for i in range(0, num_batches):
             output = self._doForwardProp(x_batches[i])
             y_pred.append(output.T)
             # print
-            printProgressBar(i + 1, num_batches, prefix = str(self.batch_size * (i + 1)) + '/' + str(n_samples) + ' -', suffix = '', length = np.min((30, num_batches)), timer = int(np.round(timer() - start_time, 0))) if verbose == 1 else None
+            printProgressBar(i + 1, num_batches, prefix=str(self.batch_size * (i + 1)) + '/' + str(n_samples) + ' -',
+                             suffix='',
+                             length=np.min((30, num_batches)),
+                             timer=int(np.round(timer() - start_time, 0))) if verbose == 1 else None
         print() if verbose == 1 else None
         return np.squeeze(np.array(y_pred).reshape(X.shape[1], self.A[self.n_layers].shape[0]))
 
-    def _prepData(self, x, y = None):
+    def _prepData(self, x, y=None):
         # Check if input is a pandas dataframe. If so, convert to np.array
         if isinstance(x, pd.DataFrame) or isinstance(x, pd.Series):
             x = np.array(X.values)
@@ -150,7 +176,7 @@ class Sequential:
 
     def _prepBatches(self, data, num_batches, axis=-1):
         """Split data into batches"""
-        return np.split(data, num_batches, axis=axis)  
+        return np.split(data, num_batches, axis=axis)
 
     def _computeLoss(self, y):
         loss = self.lossf.L(self.layers[self.n_layers].output, y)
@@ -158,8 +184,9 @@ class Sequential:
         regularization = 0
         for layer in range(1, self.n_layers + 1):
             if isinstance(self.layers[layer], WeightRegularization):
-                regularization += self.layers[layer].LossRegularization(self, layer)
-        regularization = 1/self.batch_size*regularization
+                regularization += self.layers[layer].LossRegularization(
+                    self, layer)
+        regularization = 1 / self.batch_size * regularization
         loss += regularization
         return loss
 

@@ -1,10 +1,10 @@
 import numpy as np
 
+
 class Regularizer:
-    
     lambd = 0.01
 
-    def __init__(self, lambd = 0.01):
+    def __init__(self, lambd=0.01):
         self.lambd = lambd
 
     def regularize_loss(self, weights):

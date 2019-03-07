@@ -1,12 +1,14 @@
 import numpy as np
 
+
 class ActivationFunction:
-    
+
     def g(self, z):
         return z
 
     def g_prime(self, z):
         return z
+
 
 class Linear(ActivationFunction):
 
@@ -15,6 +17,7 @@ class Linear(ActivationFunction):
 
     def g_prime(self, z):
         return 1.0
+
 
 class Sigmoid(ActivationFunction):
 
@@ -25,6 +28,7 @@ class Sigmoid(ActivationFunction):
         o = self.g(z)
         return np.multiply(o, (1.0 - o))
 
+
 class Tanh(ActivationFunction):
 
     def g(self, z):
@@ -32,6 +36,7 @@ class Tanh(ActivationFunction):
 
     def g_prime(self, z):
         return 1.0 - np.square(self.g(z))
+
 
 class ReLU(ActivationFunction):
 
@@ -49,6 +54,7 @@ class Leaky_ReLU(ActivationFunction):
 
     def g_prime(self, z):
         return (z > 0) * 1 + (z <= 0) * 0.01
+
 
 class Softmax(ActivationFunction):
 
