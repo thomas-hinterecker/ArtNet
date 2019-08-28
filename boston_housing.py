@@ -1,33 +1,18 @@
-from NeuralNetwork.lib import r_squared
 import numpy as np
-from NeuralNetwork.layers import Input, Dense
-from NeuralNetwork.lib import r_squared
-from NeuralNetwork.losses import MeanSquaredError
-from NeuralNetwork.models import Sequential
-from NeuralNetwork.optimizers import Adam
-# Data
+from ArtNet.layers import Input, Dense
+from ArtNet.lib import r_squared
+from ArtNet.losses import MeanSquaredError
+from ArtNet.models import Sequential
+from ArtNet.optimizers import Adam
 from keras.datasets import boston_housing
 from matplotlib import pyplot
 
-# np.seterr(all='ignore')
-
+# Data
 (x_train, y_train), (x_test, y_test) = boston_housing.load_data()
 
-# x_train = normalize(x_train, axis=0)
-# y_train = normalize(y_train.reshape(-1, 1))
-
-# x_test = normalize(x_test, axis=0)
-# y_test = normalize(y_test.reshape(-1, 1))
-
-
-# print(x_train.shape)
-# print(y_train.shape)
-
-# Neural Network
-# sys.path.append("NeuralNetwork")
-
+# Model
 model = Sequential()
-model.add(Input(features=13))
+model.add(Input(input_shape=13))
 model.add(Dense(nodes=26, activation="ReLU"))
 # model.add(BatchNormalization())
 # model.add(Activation("Tanh"))
@@ -40,6 +25,7 @@ model.add(Dense(nodes=1))
 model.compile(loss=MeanSquaredError(), optimizer=Adam())
 model.fit(x_train, y_train, epochs=5, batch_size=4)
 
+# Evaluate
 y_pred = model.predict(x_test, batch_size=x_test.shape[0], verbose=0)
 print(y_pred)
 print(y_test.reshape(1, -1))
