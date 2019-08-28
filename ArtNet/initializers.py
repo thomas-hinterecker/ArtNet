@@ -1,21 +1,19 @@
 import numpy as np
 
 
-# TODO: apply regularizer on loss functions
-
-
 class Initializer:
 
     def __init__(self):
         pass
 
-    def initialize(self, n_inputs, n_nodes):
+    def initialize(self, shape):
         pass
 
 
 class Zeros(Initializer):
 
     def initialize(self, shape):
+        super().__init__()
         return np.zeros(shape)
 
 
@@ -29,6 +27,7 @@ class RandomUniform(Initializer):
     seed = None
 
     def __init__(self, seed=None):
+        super().__init__()
         self.seed = seed
 
     def initialize(self, shape):
@@ -40,6 +39,7 @@ class GlorotNormal(Initializer):
     seed = None
 
     def __init__(self, seed=None):
+        super().__init__()
         self.seed = seed
 
     def initialize(self, shape):
@@ -51,6 +51,7 @@ class GlorotUniform(Initializer):
     seed = None
 
     def __init__(self, seed=None):
+        super().__init__()
         self.seed = seed
 
     def initialize(self, shape):

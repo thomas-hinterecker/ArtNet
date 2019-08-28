@@ -47,7 +47,7 @@ class ReLU(ActivationFunction):
         return (z > 0) * 1 + (z <= 0) * 0
 
 
-class Leaky_ReLU(ActivationFunction):
+class LeakyReLU(ActivationFunction):
 
     def g(self, z):
         return np.maximum(0.01 * z, z)
